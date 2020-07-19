@@ -11,4 +11,4 @@ much easier.
 - [pretty](https://docs.rs/pretty)
 - [logos](https://docs.rs/logos)
 - [cranelift](https://docs.rs/cranelift) or [inkwell](https://github.com/TheDan64/inkwell) or some other llvm bindings
-- probably some other crates like [logos](https://docs.rs/logos) or [lexical_core](https://docs.rs/lexical_core)
+- probably some other crates like [lasso](https://docs.rs/lasso) or [lexical_core](https://docs.rs/lexical_core)
