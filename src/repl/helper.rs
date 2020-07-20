@@ -3,17 +3,15 @@ use rustyline::{
     completion::Completer,
     highlight::{Highlighter, MatchingBracketHighlighter},
     hint::Hinter,
-    line_buffer::LineBuffer,
-    validate::{MatchingBracketValidator, ValidationContext, ValidationResult, Validator},
+    validate::{ValidationContext, ValidationResult, Validator},
     Context,
 };
 use rustyline_derive::Helper;
-use std::{borrow::Cow, marker::PhantomData};
+use std::borrow::Cow;
 
-#[derive(Helper)]
+#[derive(Helper, Default)]
 pub(super) struct ReplHelper {
     highlighter: MatchingBracketHighlighter,
-    _priv: PhantomData<Self>,
 }
 
 impl Highlighter for ReplHelper {
