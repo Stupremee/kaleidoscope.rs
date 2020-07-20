@@ -1,5 +1,5 @@
-use codespan_reporting::files::{line_starts, Files};
-use std::{cmp::Ordering, fmt, sync::Arc};
+use codespan_reporting::files::Files;
+use std::{cmp::Ordering, fmt, ops::Range, sync::Arc};
 
 /// An interned file, which can be resolved using the `SourceDatabase`.
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
@@ -32,17 +32,11 @@ pub struct File {
     name: Arc<str>,
     /// The source of this file.
     source: Arc<str>,
-    /// The starting byte indices in the source code.
-    line_starts: Vec<usize>,
 }
 
 impl File {
     pub fn new(name: Arc<str>, source: Arc<str>) -> Self {
-        Self {
-            name,
-            line_starts: line_starts(&source).collect(),
-            source,
-        }
+        Self { name, source }
     }
 }
 
@@ -56,6 +50,22 @@ trait SourceDatabase: salsa::Database {
     /// Looks up the given `FileId` and then returns a reference to the source of
     /// the File.
     fn source(&self, file: FileId) -> Arc<str>;
+
+    /// Looks up the given `FileId` and then returns a reference to the name of
+    /// the File.
+    fn name(&self, file: FileId) -> Arc<str>;
+
+    /// Returns the index of the line at the given byte index in the given file.
+    fn line_index(&self, file: FileId, byte_index: usize) -> Option<usize>;
+
+    /// Returns the byte range of the given line in the given file.
+    fn line_range(&self, file: FileId, line_index: usize) -> Option<Range<usize>>;
+
+    /// Returns the indices of every line start in the file.
+    fn line_starts(&self, file: FileId) -> Arc<Vec<usize>>;
+
+    /// Returns the start index of the line in the file.
+    fn line_start(&self, file: FileId, line_index: usize) -> Option<usize>;
 }
 
 /// The implementation for the `source` query.
@@ -64,15 +74,45 @@ fn source(db: &dyn SourceDatabase, file: FileId) -> Arc<str> {
     Arc::clone(&file.source)
 }
 
+fn name(db: &dyn SourceDatabase, file: FileId) -> Arc<str> {
+    let file = db.lookup_intern_file(file);
+    Arc::clone(&file.name)
+}
+
+fn line_starts(db: &dyn SourceDatabase, file: FileId) -> Arc<Vec<usize>> {
+    let starts = codespan_reporting::files::line_starts(&db.source(file)).collect();
+    Arc::new(starts)
+}
+
+fn line_start(db: &dyn SourceDatabase, file: FileId, line_index: usize) -> Option<usize> {
+    let len = db.line_starts(file).len();
+    match line_index.cmp(&len) {
+        Ordering::Less => db.line_starts(file).get(line_index).copied(),
+        Ordering::Equal => Some(db.source(file).len()),
+        Ordering::Greater => None,
+    }
+}
+
+fn line_index(db: &dyn SourceDatabase, file: FileId, byte_index: usize) -> Option<usize> {
+    match db.line_starts(file).binary_search(&byte_index) {
+        Ok(line) => Some(line),
+        Err(line) => Some(line - 1),
+    }
+}
+
+fn line_range(db: &dyn SourceDatabase, file: FileId, line_index: usize) -> Option<Range<usize>> {
+    let line = db.line_start(file, line_index)?;
+    let next_line = db.line_start(file, line_index + 1)?;
+    Some(line..next_line)
+}
+
 impl<'a> Files<'a> for dyn SourceDatabase {
     type FileId = FileId;
     type Name = Arc<str>;
     type Source = Arc<str>;
 
     fn name(&'a self, id: Self::FileId) -> Option<Self::Name> {
-        let file = self.lookup_intern_file(id);
-        let name = Arc::clone(&file.name);
-        Some(name)
+        Some(self.name(id))
     }
 
     fn source(&'a self, id: Self::FileId) -> Option<Self::Source> {
@@ -80,25 +120,10 @@ impl<'a> Files<'a> for dyn SourceDatabase {
     }
 
     fn line_index(&'a self, id: Self::FileId, byte_index: usize) -> Option<usize> {
-        let file = self.lookup_intern_file(id);
-        match file.line_starts.binary_search(&byte_index) {
-            Ok(line) => Some(line),
-            Err(next_line) => Some(next_line - 1),
-        }
+        self.line_index(id, byte_index)
     }
 
     fn line_range(&'a self, id: Self::FileId, line_index: usize) -> Option<std::ops::Range<usize>> {
-        let file = self.lookup_intern_file(id);
-
-        let line_start = |file: &File, idx: usize| match idx.cmp(&file.line_starts.len()) {
-            Ordering::Less => file.line_starts.get(idx).cloned(),
-            Ordering::Equal => Some(file.source.len()),
-            Ordering::Greater => None,
-        };
-
-        let line = line_start(&file, line_index)?;
-        let next_line = line_start(&file, line_index + 1)?;
-
-        Some(line..next_line)
+        self.line_range(id, line_index)
     }
 }
