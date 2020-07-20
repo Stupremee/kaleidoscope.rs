@@ -3,3 +3,4 @@
 #![warn(clippy::all)]
 
 pub mod parse;
+pub mod source;
