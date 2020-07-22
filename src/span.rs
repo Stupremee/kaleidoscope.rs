@@ -58,7 +58,7 @@ impl Span {
         val.index(start..end)
     }
 
-    pub fn span<T>(self, file: FileId, data: T) -> Locatable<T> {
+    pub fn locate<T>(self, file: FileId, data: T) -> Locatable<T> {
         Locatable {
             data,
             span: self,
