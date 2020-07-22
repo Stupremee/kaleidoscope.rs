@@ -1,4 +1,5 @@
 use codespan_reporting::files::Files;
+use smol_str::SmolStr;
 use std::{cmp::Ordering, fmt, ops::Range, sync::Arc};
 
 /// An interned file, which can be resolved using the `SourceDatabase`.
@@ -29,19 +30,19 @@ pub struct File {
     // I'm not sure if it's the right way, but I want to avoid that salsa
     // clones the whole source code every time you lookup the file.
     /// The `name` of the file.
-    name: Arc<str>,
+    name: Arc<SmolStr>,
     /// The source of this file.
-    source: Arc<str>,
+    source: Arc<String>,
 }
 
 impl File {
-    pub fn new(name: Arc<str>, source: Arc<str>) -> Self {
+    pub fn new(name: Arc<SmolStr>, source: Arc<String>) -> Self {
         Self { name, source }
     }
 }
 
 #[salsa::query_group(SourceDatabaseStorage)]
-trait SourceDatabase: salsa::Database {
+pub trait SourceDatabase: salsa::Database {
     /// Interns the given `File` and returns a `FileId` which can later be used to
     /// lookup the `File` using `lookup_intern_file`.
     #[salsa::interned]
@@ -49,11 +50,11 @@ trait SourceDatabase: salsa::Database {
 
     /// Looks up the given `FileId` and then returns a reference to the source of
     /// the File.
-    fn source(&self, file: FileId) -> Arc<str>;
+    fn source(&self, file: FileId) -> Arc<String>;
 
     /// Looks up the given `FileId` and then returns a reference to the name of
     /// the File.
-    fn name(&self, file: FileId) -> Arc<str>;
+    fn name(&self, file: FileId) -> Arc<SmolStr>;
 
     /// Returns the index of the line at the given byte index in the given file.
     fn line_index(&self, file: FileId, byte_index: usize) -> Option<usize>;
@@ -69,12 +70,12 @@ trait SourceDatabase: salsa::Database {
 }
 
 /// The implementation for the `source` query.
-fn source(db: &dyn SourceDatabase, file: FileId) -> Arc<str> {
+fn source(db: &dyn SourceDatabase, file: FileId) -> Arc<String> {
     let file = db.lookup_intern_file(file);
     Arc::clone(&file.source)
 }
 
-fn name(db: &dyn SourceDatabase, file: FileId) -> Arc<str> {
+fn name(db: &dyn SourceDatabase, file: FileId) -> Arc<SmolStr> {
     let file = db.lookup_intern_file(file);
     Arc::clone(&file.name)
 }
@@ -108,15 +109,15 @@ fn line_range(db: &dyn SourceDatabase, file: FileId, line_index: usize) -> Optio
 
 impl<'a> Files<'a> for dyn SourceDatabase {
     type FileId = FileId;
-    type Name = Arc<str>;
-    type Source = Arc<str>;
+    type Name = Arc<SmolStr>;
+    type Source = &'a str;
 
     fn name(&'a self, id: Self::FileId) -> Option<Self::Name> {
         Some(self.name(id))
     }
 
     fn source(&'a self, id: Self::FileId) -> Option<Self::Source> {
-        Some(self.source(id))
+        todo!()
     }
 
     fn line_index(&'a self, id: Self::FileId, byte_index: usize) -> Option<usize> {

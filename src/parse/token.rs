@@ -1,5 +1,6 @@
-use logos::Logos;
-use std::fmt;
+use crate::span::Span;
+use logos::{Lexer, Logos};
+use std::{fmt, sync::Arc};
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq)]
 pub enum Kind {
@@ -62,6 +63,46 @@ impl fmt::Display for Kind {
             Kind::Error => "error",
         };
         write!(f, "{}", repr)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Token<'input> {
+    pub span: Span,
+    pub kind: Kind,
+    pub slice: &'input str,
+}
+
+#[derive(Clone)]
+pub struct TokenStream<'input> {
+    tokens: Lexer<'input, Kind>,
+}
+
+impl<'input> TokenStream<'input> {
+    pub fn new(src: &'input str) -> Self {
+        Self {
+            tokens: Kind::lexer(src),
+        }
+    }
+}
+
+impl<'input> Iterator for TokenStream<'input> {
+    type Item = Token<'input>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let kind = self.tokens.next()?;
+        let span = self.tokens.span().into();
+        let slice = self.tokens.slice();
+        Some(Token { span, kind, slice })
+    }
+}
+
+impl fmt::Debug for TokenStream<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let tokens = self.clone().collect::<Vec<_>>();
+        f.debug_struct("TokenStream")
+            .field("tokens", &tokens)
+            .finish()
     }
 }
 

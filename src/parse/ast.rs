@@ -9,18 +9,28 @@ pub struct Identifier {
 }
 
 #[derive(Debug, Clone)]
-pub struct Prototype {
-    pub name: Identifier,
-    pub args: Vec<Identifier>,
-    pub is_op: bool,
-    pub prec: usize,
+pub struct Item {
+    pub span: Span,
+    pub kind: ItemKind,
 }
 
 #[derive(Debug, Clone)]
-pub struct Function {
-    pub proto: Prototype,
-    /// If body is `None`, its an `extern` function.
-    pub body: Option<Expr>,
+pub enum ItemKind {
+    Function {
+        name: Identifier,
+        args: Vec<Identifier>,
+        body: Box<Expr>,
+    },
+    Extern {
+        name: Identifier,
+        args: Vec<Identifier>,
+    },
+    Operator {
+        op: char,
+        prec: usize,
+        /// True if the operator is binary, false if its a unary op.
+        is_binary: bool,
+    },
 }
 
 #[derive(Debug, Clone)]
