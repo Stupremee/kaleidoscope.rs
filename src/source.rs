@@ -41,6 +41,24 @@ impl File {
     }
 }
 
+/// A atomic counted reference to a `String`, which implements `AsRef<str>`
+#[derive(Debug)]
+pub struct StringRef {
+    string: Arc<String>,
+}
+
+impl StringRef {
+    pub fn new(string: Arc<String>) -> Self {
+        Self { string }
+    }
+}
+
+impl AsRef<str> for StringRef {
+    fn as_ref(&self) -> &str {
+        self.string.as_ref()
+    }
+}
+
 #[salsa::query_group(SourceDatabaseStorage)]
 pub trait SourceDatabase: salsa::Database {
     /// Interns the given `File` and returns a `FileId` which can later be used to
@@ -110,21 +128,22 @@ fn line_range(db: &dyn SourceDatabase, file: FileId, line_index: usize) -> Optio
 impl<'a> Files<'a> for dyn SourceDatabase {
     type FileId = FileId;
     type Name = Arc<SmolStr>;
-    type Source = &'a str;
+    type Source = StringRef;
 
     fn name(&'a self, id: Self::FileId) -> Option<Self::Name> {
         Some(self.name(id))
     }
 
     fn source(&'a self, id: Self::FileId) -> Option<Self::Source> {
-        todo!()
+        let source = self.source(id);
+        Some(StringRef::new(source))
     }
 
     fn line_index(&'a self, id: Self::FileId, byte_index: usize) -> Option<usize> {
         self.line_index(id, byte_index)
     }
 
-    fn line_range(&'a self, id: Self::FileId, line_index: usize) -> Option<std::ops::Range<usize>> {
+    fn line_range(&'a self, id: Self::FileId, line_index: usize) -> Option<Range<usize>> {
         self.line_range(id, line_index)
     }
 }
