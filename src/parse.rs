@@ -1,14 +1,14 @@
-use self::token::TokenStream;
+use self::token::{Token, TokenStream};
 use crate::source::{FileId, SourceDatabase};
-use std::{fmt, iter::Peekable};
+use std::iter::Peekable;
 
 pub mod ast;
-mod token;
+pub mod token;
 
 #[salsa::query_group(FrontendDatabaseStorage)]
 pub trait FrontendDatabase: SourceDatabase {}
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Parser<'input> {
     tokens: Peekable<TokenStream<'input>>,
     file: FileId,
@@ -21,13 +21,15 @@ impl<'input> Parser<'input> {
             file,
         }
     }
-}
 
-impl fmt::Debug for Parser<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Parser")
-            .field("tokens", &self.tokens)
-            .field("file", &self.file)
-            .finish()
+    fn peek(&mut self) -> Option<&Token<'input>> {
+        self.tokens.peek()
+    }
+
+    fn next(&mut self) -> Option<Token<'input>> {
+        self.tokens.next()
     }
 }
+
+// Expression parsing methods
+impl<'input> Parser<'input> {}

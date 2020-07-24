@@ -47,12 +47,6 @@ pub struct StringRef {
     string: Arc<String>,
 }
 
-impl StringRef {
-    pub fn new(string: Arc<String>) -> Self {
-        Self { string }
-    }
-}
-
 impl AsRef<str> for StringRef {
     fn as_ref(&self) -> &str {
         self.string.as_ref()
@@ -136,7 +130,7 @@ impl<'a> Files<'a> for dyn SourceDatabase {
 
     fn source(&'a self, id: Self::FileId) -> Option<Self::Source> {
         let source = self.source(id);
-        Some(StringRef::new(source))
+        Some(StringRef { string: source })
     }
 
     fn line_index(&'a self, id: Self::FileId, byte_index: usize) -> Option<usize> {
