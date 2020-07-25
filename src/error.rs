@@ -56,23 +56,24 @@ pub trait IntoDiagnostic {
 
 /// Any error that can happen while parsing.
 #[derive(Debug, Clone)]
-pub enum ParseError {
+pub enum SyntaxError {
     Expected { expected: Kind, found: Kind },
     ExpectedOneOf { expected: Vec<Kind>, found: Kind },
+    UnexecptedEof,
+    ExpectedExpression,
+    InvalidNumber,
 }
 
-pub type ParseResult<T> = std::result::Result<T, Locatable<ParseError>>;
+pub type ParseResult<T> = std::result::Result<T, Locatable<SyntaxError>>;
 
-impl IntoDiagnostic for ParseError {
+impl IntoDiagnostic for SyntaxError {
     fn into_diagnostic(self, file: FileId, span: Span) -> Diagnostic {
         match self {
-            ParseError::Expected { expected, found } => {
-                diagnostic! {
-                    error => "unexpected token",
-                    label: primary(format!("expected '{}', found '{}'", expected, found), file, span),
-                }
-            }
-            ParseError::ExpectedOneOf { expected, found } => {
+            SyntaxError::Expected { expected, found } => diagnostic! {
+                error => "unexpected token",
+                label: primary(format!("expected '{}', found '{}'", expected, found), file, span),
+            },
+            SyntaxError::ExpectedOneOf { expected, found } => {
                 let expected = expected
                     .into_iter()
                     .map(|kind| format!("'{}'", kind))
@@ -83,6 +84,18 @@ impl IntoDiagnostic for ParseError {
                     label: primary(format!("expected one of {}, found '{}'", expected, found), file, span),
                 }
             }
+            SyntaxError::UnexecptedEof => diagnostic! {
+                error => "unexpected eof",
+                label: primary("unexpected eof here", file, span),
+            },
+            SyntaxError::ExpectedExpression => diagnostic! {
+                error => "expected expression",
+                label: primary("expected expression here", file, span),
+            },
+            SyntaxError::InvalidNumber => diagnostic! {
+                error => "invalid number",
+                label: primary("is not a valid number", file, span),
+            },
         }
     }
 }
