@@ -6,6 +6,12 @@ use std::{cmp::Ordering, fmt, ops::Range, sync::Arc};
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub struct FileId(salsa::InternId);
 
+impl Default for FileId {
+    fn default() -> Self {
+        Self(0usize.into())
+    }
+}
+
 impl fmt::Display for FileId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)

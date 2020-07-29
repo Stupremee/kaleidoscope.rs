@@ -1,6 +1,6 @@
 use crate::span::Span;
 use logos::{Lexer, Logos};
-use std::{fmt, sync::Arc};
+use std::fmt;
 
 #[derive(Logos, Clone, Copy, Debug, PartialEq)]
 pub enum Kind {
@@ -13,6 +13,10 @@ pub enum Kind {
     Extern,
     #[token("if")]
     If,
+    #[token("for")]
+    For,
+    #[token("var")]
+    Var,
     #[token("then")]
     Then,
     #[token("else")]
@@ -21,6 +25,8 @@ pub enum Kind {
     Binary,
     #[token("unary")]
     Unary,
+    #[token("in")]
+    In,
 
     #[token("(")]
     LeftParen,
@@ -28,6 +34,8 @@ pub enum Kind {
     RightParen,
     #[token(",")]
     Comma,
+    #[token("=")]
+    Equal,
 
     #[regex("[a-zA-Z][a-zA-Z0-9]*")]
     Identifier,
@@ -61,6 +69,10 @@ impl fmt::Display for Kind {
             Kind::Number => "number",
             Kind::Operator => "operator",
             Kind::Error => "error",
+            Kind::For => "for",
+            Kind::In => "in",
+            Kind::Equal => "=",
+            Kind::Var => "var",
         };
         write!(f, "{}", repr)
     }
