@@ -36,6 +36,8 @@ pub enum Kind {
     Comma,
     #[token("=")]
     Equal,
+    #[token(";")]
+    Semicolon,
 
     #[regex("[a-zA-Z][a-zA-Z0-9]*")]
     Identifier,
@@ -73,6 +75,7 @@ impl fmt::Display for Kind {
             Kind::In => "in",
             Kind::Equal => "=",
             Kind::Var => "var",
+            Kind::Semicolon => ";",
         };
         write!(f, "{}", repr)
     }

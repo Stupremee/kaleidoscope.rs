@@ -1,5 +1,5 @@
 use self::{
-    ast::{Expr, ExprKind, Identifier, LetVar},
+    ast::{Expr, ExprKind, Identifier, Item, ItemKind, LetVar},
     token::{Kind, Token, TokenStream},
 };
 use crate::{
@@ -80,6 +80,106 @@ impl<'input> Parser<'input> {
                 token.span,
                 self.file,
             )),
+        }
+    }
+
+    fn eat_one_of<T: AsRef<[Kind]>>(&mut self, kinds: T) -> ParseResult<Token<'input>> {
+        let kinds = kinds.as_ref();
+        match self.peek()? {
+            token if kinds.contains(&token.kind) => Ok(self.next().unwrap()),
+            token => Err(Locatable::new(
+                SyntaxError::ExpectedOneOf {
+                    expected: kinds.to_vec(),
+                    found: token.kind,
+                },
+                token.span,
+                self.file,
+            )),
+        }
+    }
+}
+
+// Top level parsing
+impl<'input> Parser<'input> {
+    pub fn parse_item(&mut self) -> ParseResult<Item> {
+        let token = self.peek()?;
+        match token.kind {
+            Kind::Def => self.parse_def(),
+
+            kind => Err(Locatable::new(
+                SyntaxError::ExpectedOneOf {
+                    expected: vec![Kind::Def, Kind::Extern],
+                    found: kind,
+                },
+                token.span,
+                self.file,
+            )),
+        }
+    }
+
+    fn parse_def(&mut self) -> ParseResult<Item> {
+        let def_span = self.eat(Kind::Def)?.span;
+        let def = self.eat_one_of([Kind::Def, Kind::Extern])?;
+        match &def.kind {
+            Kind::Extern => {
+                let name = self.eat(Kind::Identifier)?;
+                let name = self.intern_identifier(&name);
+                self.eat(Kind::LeftParen)?;
+
+                let mut args = Vec::new();
+                while let Ok(name) = self.eat(Kind::Identifier) {
+                    args.push(self.intern_identifier(&name));
+                }
+
+                self.eat(Kind::RightParen)?;
+                let semi = self.eat(Kind::Semicolon)?.span;
+                Ok(Item {
+                    span: def.span.merge(semi),
+                    kind: ItemKind::Extern { name, args },
+                })
+            }
+            Kind::Def => {
+                let token = self.eat_one_of([Kind::Identifier, Kind::Unary, Kind::Binary])?;
+                match &token.kind {
+                    Kind::Identifier => {
+                        let name = self.eat(Kind::Identifier)?;
+                        let name = self.intern_identifier(&name);
+                        self.eat(Kind::LeftParen)?;
+
+                        let mut args = Vec::new();
+                        while let Ok(name) = self.eat(Kind::Identifier) {
+                            args.push(self.intern_identifier(&name));
+                        }
+
+                        self.eat(Kind::RightParen)?;
+
+                        let body = self.parse_expr()?;
+                        let semi = self.eat(Kind::Semicolon)?.span;
+                        Ok(Item {
+                            span: def.span.merge(semi),
+                            kind: ItemKind::Function {
+                                name,
+                                args,
+                                body: Box::new(body),
+                            },
+                        })
+                    }
+                    Kind::Binary => {
+                        let op = match self.eat(Kind::Operator)? {
+                            Token {
+                                kind: Kind::Operator,
+                                slice,
+                                ..
+                            } => slice.chars().next().unwrap(),
+                            _ => unreachable!(),
+                        };
+
+                        todo!()
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            _ => unreachable!(),
         }
     }
 }

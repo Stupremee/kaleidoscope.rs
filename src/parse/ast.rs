@@ -27,8 +27,9 @@ pub enum ItemKind {
     },
     Operator {
         op: char,
-        prec: usize,
+        prec: isize,
         /// True if the operator is binary, false if its a unary op.
+        /// The precedence is -1 if it's a unary op
         is_binary: bool,
     },
 }
