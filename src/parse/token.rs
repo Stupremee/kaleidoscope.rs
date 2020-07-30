@@ -108,6 +108,9 @@ impl<'input> Iterator for TokenStream<'input> {
         let kind = self.tokens.next()?;
         let span = self.tokens.span().into();
         let slice = self.tokens.slice();
+        if matches!(kind, Kind::Comment) {
+            return self.next();
+        }
         Some(Token { span, kind, slice })
     }
 }

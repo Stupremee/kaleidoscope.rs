@@ -21,31 +21,12 @@ pub trait FrontendDatabase: SourceDatabase {
 
     /// Tries to parse the source code of the given file.
     fn parse(&self, file: FileId) -> ParseResult<Vec<Item>>;
-
-    /// Tries to parse the source code and emits the errors if one occurrs.
-    fn parse_emit(&self, file: FileId) -> Option<Vec<Item>>;
 }
 
 fn parse(db: &dyn FrontendDatabase, file: FileId) -> ParseResult<Vec<Item>> {
     let code = db.source(file);
     let mut parser = Parser::new(db.rodeo(), &code, file);
     parser.parse()
-}
-
-fn parse_emit(db: &dyn FrontendDatabase, file: FileId) -> Option<Vec<Item>> {
-    let db: &dyn SourceDatabase = db;
-    let items = db.parse(file);
-    match items {
-        Ok(items) => Some(items),
-        Err(err) => {
-            use codespan_reporting::term::{self, termcolor};
-
-            let mut stdout = termcolor::StandardStream::stdout(termcolor::ColorChoice::Auto);
-            let config = term::Config::default();
-            term::emit(&mut stdout, &config, &db, &err.into()).expect("failed to emit diagnostic");
-            None
-        }
-    }
 }
 
 #[derive(Clone)]

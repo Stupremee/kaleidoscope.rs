@@ -1,4 +1,3 @@
-use crate::Diagnostic;
 use smol_str::SmolStr;
 use std::{cmp::Ordering, fmt, ops::Range, sync::Arc};
 
@@ -44,18 +43,6 @@ pub struct File {
 impl File {
     pub fn new(name: Arc<SmolStr>, source: Arc<String>) -> Self {
         Self { name, source }
-    }
-}
-
-/// A atomic counted reference to a `String`, which implements `AsRef<str>`
-#[derive(Debug)]
-pub struct StringRef {
-    string: Arc<String>,
-}
-
-impl AsRef<str> for StringRef {
-    fn as_ref(&self) -> &str {
-        self.string.as_ref()
     }
 }
 
@@ -123,27 +110,4 @@ fn line_range(db: &dyn SourceDatabase, file: FileId, line_index: usize) -> Optio
     let line = db.line_start(file, line_index)?;
     let next_line = db.line_start(file, line_index + 1)?;
     Some(line..next_line)
-}
-
-impl<'a> codespan_reporting::files::Files<'a> for dyn SourceDatabase {
-    type FileId = FileId;
-    type Name = Arc<SmolStr>;
-    type Source = StringRef;
-
-    fn name(&'a self, id: Self::FileId) -> Option<Self::Name> {
-        Some(self.name(id))
-    }
-
-    fn source(&'a self, id: Self::FileId) -> Option<Self::Source> {
-        let source = self.source(id);
-        Some(StringRef { string: source })
-    }
-
-    fn line_index(&'a self, id: Self::FileId, byte_index: usize) -> Option<usize> {
-        self.line_index(id, byte_index)
-    }
-
-    fn line_range(&'a self, id: Self::FileId, line_index: usize) -> Option<Range<usize>> {
-        self.line_range(id, line_index)
-    }
 }

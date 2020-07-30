@@ -6,12 +6,7 @@
 mod helper;
 
 use self::helper::ReplHelper;
-use kaleidoscope::{
-    parse::FrontendDatabase,
-    source::SourceDatabase,
-    source::{emit, File},
-    Compiler,
-};
+use kaleidoscope::{parse::FrontendDatabase, source::File, source::SourceDatabase, Compiler};
 use rustyline::{error::ReadlineError, Cmd, CompletionType, Config, EditMode, Editor, KeyPress};
 use smol_str::SmolStr;
 use std::sync::Arc;
@@ -39,10 +34,12 @@ impl Repl {
         editor.bind_sequence(KeyPress::Up, Cmd::LineUpOrPreviousHistory(1));
         editor.bind_sequence(KeyPress::Down, Cmd::LineDownOrNextHistory(1));
 
+        let mut db = Compiler::default();
+        db.set_rodeo(Arc::new(Default::default()));
         Self {
             editor,
             prompt: prompt.into(),
-            db: Compiler::default(),
+            db,
         }
     }
 
@@ -75,14 +72,7 @@ impl Repl {
                     println!("=> {:#?}", item);
                 }
             }
-            Err(err) => {
-                use codespan_reporting::term::{self, termcolor};
-
-                let mut stdout = termcolor::StandardStream::stdout(termcolor::ColorChoice::Auto);
-                let config = term::Config::default();
-                term::emit(&mut stdout, &config, &self.db, &err.into())
-                    .expect("failed to emit diagnostic");
-            }
-        }
+            Err(err) => self.db.emit(err.into()).expect("failed to emit diagnostic"),
+        };
     }
 }
