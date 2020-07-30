@@ -17,6 +17,12 @@ pub mod token;
 pub trait FrontendDatabase: SourceDatabase {
     #[salsa::input]
     fn rodeo(&self) -> Arc<ThreadedRodeo>;
+
+    fn parse(&self, file: FileId) -> ParseResult<Vec<Item>>;
+}
+
+fn parse(db: &dyn FrontendDatabase, file: FileId) -> ParseResult<Vec<Item>> {
+    todo!()
 }
 
 #[derive(Clone)]
@@ -118,7 +124,6 @@ impl<'input> Parser<'input> {
     }
 
     fn parse_def(&mut self) -> ParseResult<Item> {
-        let def_span = self.eat(Kind::Def)?.span;
         let def = self.eat_one_of([Kind::Def, Kind::Extern])?;
         match &def.kind {
             Kind::Extern => {
@@ -141,46 +146,102 @@ impl<'input> Parser<'input> {
             Kind::Def => {
                 let token = self.eat_one_of([Kind::Identifier, Kind::Unary, Kind::Binary])?;
                 match &token.kind {
-                    Kind::Identifier => {
-                        let name = self.eat(Kind::Identifier)?;
-                        let name = self.intern_identifier(&name);
-                        self.eat(Kind::LeftParen)?;
-
-                        let mut args = Vec::new();
-                        while let Ok(name) = self.eat(Kind::Identifier) {
-                            args.push(self.intern_identifier(&name));
-                        }
-
-                        self.eat(Kind::RightParen)?;
-
-                        let body = self.parse_expr()?;
-                        let semi = self.eat(Kind::Semicolon)?.span;
-                        Ok(Item {
-                            span: def.span.merge(semi),
-                            kind: ItemKind::Function {
-                                name,
-                                args,
-                                body: Box::new(body),
-                            },
-                        })
-                    }
-                    Kind::Binary => {
-                        let op = match self.eat(Kind::Operator)? {
-                            Token {
-                                kind: Kind::Operator,
-                                slice,
-                                ..
-                            } => slice.chars().next().unwrap(),
-                            _ => unreachable!(),
-                        };
-
-                        todo!()
-                    }
+                    Kind::Identifier => self.parse_function(def.span, token),
+                    Kind::Binary => self.parse_operator(def.span, true),
+                    Kind::Unary => self.parse_operator(def.span, false),
                     _ => unreachable!(),
                 }
             }
             _ => unreachable!(),
         }
+    }
+
+    fn parse_operator(&mut self, def_span: Span, binary: bool) -> ParseResult<Item> {
+        let op = match self.eat(Kind::Operator)? {
+            Token {
+                kind: Kind::Operator,
+                slice,
+                ..
+            } => slice.chars().next().unwrap(),
+            _ => unreachable!(),
+        };
+
+        let l_paren = self.eat(Kind::LeftParen)?.span;
+
+        let prec = if binary {
+            if self.next_is(Kind::Number) {
+                let num = self.eat(Kind::Number)?;
+                let (num, num_span) = (num.slice, num.span);
+                let num = num
+                    .parse::<isize>()
+                    .map_err(|_| Locatable::new(SyntaxError::InvalidNumber, num_span, self.file))?;
+                if num < 1 || num > 100 {
+                    return Err(Locatable::new(
+                        SyntaxError::InvalidPrecedence,
+                        num_span,
+                        self.file,
+                    ));
+                }
+                num
+            } else {
+                30
+            }
+        } else {
+            -1
+        };
+
+        let mut args = Vec::new();
+        while let Ok(name) = self.eat(Kind::Identifier) {
+            args.push(self.intern_identifier(&name));
+        }
+
+        let r_paren = self.eat(Kind::RightParen)?.span;
+
+        let body = self.parse_expr()?;
+        let semi = self.eat(Kind::Semicolon)?.span;
+
+        let argc = if binary { 2 } else { 1 };
+        if args.len() != argc {
+            return Err(Locatable::new(
+                SyntaxError::InvalidArgs(argc),
+                l_paren.merge(r_paren),
+                self.file,
+            ));
+        }
+
+        Ok(Item {
+            span: def_span.merge(semi),
+            kind: ItemKind::Operator {
+                op,
+                prec,
+                is_binary: binary,
+                body: Box::new(body),
+                args,
+            },
+        })
+    }
+
+    fn parse_function(&mut self, def_span: Span, name: Token<'input>) -> ParseResult<Item> {
+        let name = self.intern_identifier(&name);
+        self.eat(Kind::LeftParen)?;
+
+        let mut args = Vec::new();
+        while let Ok(name) = self.eat(Kind::Identifier) {
+            args.push(self.intern_identifier(&name));
+        }
+
+        self.eat(Kind::RightParen)?;
+
+        let body = self.parse_expr()?;
+        let semi = self.eat(Kind::Semicolon)?.span;
+        Ok(Item {
+            span: def_span.merge(semi),
+            kind: ItemKind::Function {
+                name,
+                args,
+                body: Box::new(body),
+            },
+        })
     }
 }
 

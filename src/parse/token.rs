@@ -2,7 +2,7 @@ use crate::span::Span;
 use logos::{Lexer, Logos};
 use std::fmt;
 
-#[derive(Logos, Clone, Copy, Debug, PartialEq)]
+#[derive(Logos, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
     #[regex("#[^\n]*")]
     Comment,

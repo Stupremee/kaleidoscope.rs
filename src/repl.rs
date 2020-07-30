@@ -56,6 +56,5 @@ impl Repl {
 
     fn process_line(&mut self, line: String) {
         self.editor.add_history_entry(line);
-        // todo!();
     }
 }

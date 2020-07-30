@@ -55,13 +55,15 @@ pub trait IntoDiagnostic {
 }
 
 /// Any error that can happen while parsing.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SyntaxError {
     Expected { expected: Kind, found: Kind },
     ExpectedOneOf { expected: Vec<Kind>, found: Kind },
     UnexecptedEof,
     ExpectedExpression,
     InvalidNumber,
+    InvalidPrecedence,
+    InvalidArgs(usize),
 }
 
 pub type ParseResult<T> = std::result::Result<T, Locatable<SyntaxError>>;
@@ -95,6 +97,14 @@ impl IntoDiagnostic for SyntaxError {
             SyntaxError::InvalidNumber => diagnostic! {
                 error => "invalid number",
                 label: primary("is not a valid number", file, span),
+            },
+            SyntaxError::InvalidPrecedence => diagnostic! {
+                error => "invalid precedence",
+                label: primary("the operator precedence must be 1..100", file, span),
+            },
+            SyntaxError::InvalidArgs(expected) => diagnostic! {
+                error => "invalid number of arguments",
+                label: primary(format!("expected function to have {} arguments", expected), file, span),
             },
         }
     }

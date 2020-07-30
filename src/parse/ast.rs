@@ -2,19 +2,19 @@ use crate::span::Span;
 use lasso::Spur;
 
 /// An Identifier name is interned using `lasso`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Identifier {
     pub spur: Spur,
     pub span: Span,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Item {
     pub span: Span,
     pub kind: ItemKind,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ItemKind {
     Function {
         name: Identifier,
@@ -31,16 +31,18 @@ pub enum ItemKind {
         /// True if the operator is binary, false if its a unary op.
         /// The precedence is -1 if it's a unary op
         is_binary: bool,
+        body: Box<Expr>,
+        args: Vec<Identifier>,
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Expr {
     pub span: Span,
     pub kind: ExprKind,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ExprKind {
     Number(f64),
     Var(Identifier),
@@ -76,7 +78,7 @@ pub enum ExprKind {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct LetVar {
     pub name: Identifier,
     pub val: Option<Expr>,
