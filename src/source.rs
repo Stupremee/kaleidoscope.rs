@@ -1,4 +1,4 @@
-use codespan_reporting::files::Files;
+use crate::Diagnostic;
 use smol_str::SmolStr;
 use std::{cmp::Ordering, fmt, ops::Range, sync::Arc};
 
@@ -125,7 +125,7 @@ fn line_range(db: &dyn SourceDatabase, file: FileId, line_index: usize) -> Optio
     Some(line..next_line)
 }
 
-impl<'a> Files<'a> for dyn SourceDatabase {
+impl<'a> codespan_reporting::files::Files<'a> for dyn SourceDatabase {
     type FileId = FileId;
     type Name = Arc<SmolStr>;
     type Source = StringRef;

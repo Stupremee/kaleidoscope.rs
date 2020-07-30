@@ -8,6 +8,7 @@ use crate::{
     span::{Locatable, Span},
 };
 use lasso::ThreadedRodeo;
+use ordered_float::NotNan;
 use std::{collections::HashMap, iter::Peekable, sync::Arc};
 
 pub mod ast;
@@ -18,11 +19,33 @@ pub trait FrontendDatabase: SourceDatabase {
     #[salsa::input]
     fn rodeo(&self) -> Arc<ThreadedRodeo>;
 
+    /// Tries to parse the source code of the given file.
     fn parse(&self, file: FileId) -> ParseResult<Vec<Item>>;
+
+    /// Tries to parse the source code and emits the errors if one occurrs.
+    fn parse_emit(&self, file: FileId) -> Option<Vec<Item>>;
 }
 
 fn parse(db: &dyn FrontendDatabase, file: FileId) -> ParseResult<Vec<Item>> {
-    todo!()
+    let code = db.source(file);
+    let mut parser = Parser::new(db.rodeo(), &code, file);
+    parser.parse()
+}
+
+fn parse_emit(db: &dyn FrontendDatabase, file: FileId) -> Option<Vec<Item>> {
+    let db: &dyn SourceDatabase = db;
+    let items = db.parse(file);
+    match items {
+        Ok(items) => Some(items),
+        Err(err) => {
+            use codespan_reporting::term::{self, termcolor};
+
+            let mut stdout = termcolor::StandardStream::stdout(termcolor::ColorChoice::Auto);
+            let config = term::Config::default();
+            term::emit(&mut stdout, &config, &db, &err.into()).expect("failed to emit diagnostic");
+            None
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -53,6 +76,14 @@ impl<'input> Parser<'input> {
             eof_span: Span::new(code.len(), code.len()),
             operators,
         }
+    }
+
+    pub fn parse(&mut self) -> ParseResult<Vec<Item>> {
+        let mut items = Vec::new();
+        while self.peek().is_ok() {
+            items.push(self.parse_item()?)
+        }
+        Ok(items)
     }
 
     fn peek(&mut self) -> ParseResult<&Token<'input>> {
@@ -329,9 +360,13 @@ impl<'input> Parser<'input> {
             Kind::Number => {
                 let token = self.next().unwrap();
                 let num = token.slice;
-                let num = num.parse::<f64>().map_err(|_| {
-                    Locatable::new(SyntaxError::InvalidNumber, token.span, self.file)
-                })?;
+
+                let number_err =
+                    || Locatable::new(SyntaxError::InvalidNumber, token.span, self.file);
+                let num = num
+                    .parse::<f64>()
+                    .map_err(|_| number_err())
+                    .and_then(|num| NotNan::new(num).map_err(|_| number_err()))?;
                 Ok(Expr {
                     span: token.span,
                     kind: ExprKind::Number(num),

@@ -110,8 +110,8 @@ impl IntoDiagnostic for SyntaxError {
     }
 }
 
-impl<T: IntoDiagnostic> Locatable<T> {
-    fn into_diagnostic(self) -> Diagnostic {
+impl<T: IntoDiagnostic> Into<Diagnostic> for Locatable<T> {
+    fn into(self) -> Diagnostic {
         let (data, span, file) = self.destruct();
         data.into_diagnostic(file, span)
     }

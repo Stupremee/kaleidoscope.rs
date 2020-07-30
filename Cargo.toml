@@ -6,12 +6,13 @@ edition = "2018"
 
 [dependencies]
 logos = "0.11.4"
-salsa = "0.15.0"
+salsa = "0.15.1"
 smol_str = "0.1.16"
 codespan-reporting = "0.9.5"
-lasso = { version = "0.3.0", features = ["multi-threaded"] }
+lasso = { version = "0.3.1", features = ["multi-threaded"] }
 
 # Repl stuff
 rustyline = "6.2.0"
 rustyline-derive = "0.3.1"
 ansi_term = "0.12.1"
+ordered-float = "2.0.0"

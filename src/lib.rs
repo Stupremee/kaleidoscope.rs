@@ -1,5 +1,4 @@
 #![warn(rust_2018_idioms)]
-#![warn(missing_debug_implementations)]
 #![warn(clippy::all)]
 
 pub mod error;
@@ -14,8 +13,8 @@ pub type Label = codespan_reporting::diagnostic::Label<FileId>;
 
 #[salsa::database(source::SourceDatabaseStorage, parse::FrontendDatabaseStorage)]
 #[derive(Default)]
-struct Database {
+pub struct Compiler {
     storage: salsa::Storage<Self>,
 }
 
-impl salsa::Database for Database {}
+impl salsa::Database for Compiler {}

@@ -1,20 +1,21 @@
 use crate::span::Span;
 use lasso::Spur;
+use ordered_float::NotNan;
 
 /// An Identifier name is interned using `lasso`.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Identifier {
     pub spur: Spur,
     pub span: Span,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Item {
     pub span: Span,
     pub kind: ItemKind,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ItemKind {
     Function {
         name: Identifier,
@@ -36,15 +37,15 @@ pub enum ItemKind {
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Expr {
     pub span: Span,
     pub kind: ExprKind,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExprKind {
-    Number(f64),
+    Number(NotNan<f64>),
     Var(Identifier),
     Unary {
         op: char,
@@ -78,7 +79,7 @@ pub enum ExprKind {
     },
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LetVar {
     pub name: Identifier,
     pub val: Option<Expr>,
