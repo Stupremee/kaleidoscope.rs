@@ -178,8 +178,6 @@ impl<'input> Parser<'input> {
             _ => unreachable!(),
         };
 
-        let l_paren = self.eat(Kind::LeftParen)?.span;
-
         let prec = if binary {
             if self.next_is(Kind::Number) {
                 let num = self.eat(Kind::Number)?;
@@ -201,6 +199,9 @@ impl<'input> Parser<'input> {
         } else {
             -1
         };
+        self.operators.insert(op, prec as i32);
+
+        let l_paren = self.eat(Kind::LeftParen)?.span;
 
         let mut args = Vec::new();
         while let Ok(name) = self.eat(Kind::Identifier) {
