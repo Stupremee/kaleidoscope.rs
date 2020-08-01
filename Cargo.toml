@@ -11,6 +11,7 @@ smol_str = "0.1.16"
 codespan-reporting = "0.9.5"
 lasso = { version = "0.3.1", features = ["multi-threaded"] }
 pretty = "0.10.0"
+inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "llvm10-0" }
 
 # Repl stuff
 rustyline = "6.2.0"

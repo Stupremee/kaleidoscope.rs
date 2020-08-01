@@ -54,6 +54,45 @@ pub trait IntoDiagnostic {
     fn into_diagnostic(self, file: FileId, span: Span) -> Diagnostic;
 }
 
+/// Any error that can happen while code generation.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum CompileError {
+    UnknownVariable,
+    UnknownFunction,
+    InvalidArguments { expected: usize, found: usize },
+    UnknownOperator,
+    InvalidCall,
+}
+
+pub type CompileResult<T> = std::result::Result<T, Locatable<CompileError>>;
+
+impl IntoDiagnostic for CompileError {
+    fn into_diagnostic(self, file: FileId, span: Span) -> Diagnostic {
+        match self {
+            CompileError::UnknownVariable => diagnostic! {
+                error => "unknown variable",
+                label: primary("variable not in scope", file, span),
+            },
+            CompileError::UnknownFunction => diagnostic! {
+                error => "unknown function",
+                label: primary("function not in scope", file, span),
+            },
+            CompileError::UnknownOperator => diagnostic! {
+                error => "unknown operator",
+                label: primary("operator not in scope", file, span),
+            },
+            CompileError::InvalidCall => diagnostic! {
+                error => "internal error",
+                label: primary("invalid call produced", file, span),
+            },
+            CompileError::InvalidArguments { expected, found } => diagnostic! {
+                error => "invalid number of arguments provided",
+                label: primary(format!("function takes {} arguments, but only {} were provided", expected, found), file, span),
+            },
+        }
+    }
+}
+
 /// Any error that can happen while parsing.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SyntaxError {

@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![warn(clippy::all)]
 
+pub mod codegen;
 pub mod error;
 pub mod parse;
 pub mod pretty;
