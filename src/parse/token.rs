@@ -34,8 +34,6 @@ pub enum Kind {
     RightParen,
     #[token(",")]
     Comma,
-    #[token("=")]
-    Equal,
     #[token(";")]
     Semicolon,
 
@@ -73,7 +71,6 @@ impl fmt::Display for Kind {
             Kind::Error => "error",
             Kind::For => "for",
             Kind::In => "in",
-            Kind::Equal => "=",
             Kind::Var => "var",
             Kind::Semicolon => ";",
         };

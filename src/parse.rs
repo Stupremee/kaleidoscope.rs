@@ -101,6 +101,22 @@ impl<'input> Parser<'input> {
         }
     }
 
+    /// Eats the '=' operator.
+    fn eat_equal(&mut self) -> ParseResult<()> {
+        match self.eat(Kind::Operator)? {
+            Token {
+                kind: Kind::Operator,
+                slice: "=",
+                ..
+            } => Ok(()),
+            tok => Err(Locatable::new(
+                SyntaxError::ExpectedOp { expected: '=' },
+                tok.span,
+                self.file,
+            )),
+        }
+    }
+
     fn eat_one_of<T: AsRef<[Kind]>>(&mut self, kinds: T) -> ParseResult<Token<'input>> {
         let kinds = kinds.as_ref();
         match self.peek()? {
@@ -412,7 +428,7 @@ impl<'input> Parser<'input> {
                 let for_span = self.next().unwrap().span;
                 let name = self.eat(Kind::Identifier)?;
                 let name = self.intern_identifier(&name);
-                self.eat(Kind::Equal)?;
+                self.eat_equal()?;
                 let start = self.parse_expr()?;
                 self.eat(Kind::Comma)?;
                 let end = self.parse_expr()?;
@@ -443,10 +459,16 @@ impl<'input> Parser<'input> {
                     let name = self.eat(Kind::Identifier)?;
                     let name = self.intern_identifier(&name);
 
-                    let init = if self.next_is(Kind::Equal) {
-                        Some(self.parse_expr()?)
-                    } else {
-                        None
+                    let init = match self.peek()? {
+                        Token {
+                            kind: Kind::Operator,
+                            slice: "=",
+                            ..
+                        } => {
+                            self.next().unwrap();
+                            Some(self.parse_expr()?)
+                        }
+                        _ => None,
                     };
 
                     vars.push(LetVar { name, val: init });

@@ -58,6 +58,8 @@ pub trait IntoDiagnostic {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SyntaxError {
     Expected { expected: Kind, found: Kind },
+    // This is just for the `for` expression.
+    ExpectedOp { expected: char },
     ExpectedOneOf { expected: Vec<Kind>, found: Kind },
     UnexecptedEof,
     ExpectedExpression,
@@ -105,6 +107,10 @@ impl IntoDiagnostic for SyntaxError {
             SyntaxError::InvalidArgs(expected) => diagnostic! {
                 error => "invalid number of arguments",
                 label: primary(format!("expected function to have {} arguments", expected), file, span),
+            },
+            SyntaxError::ExpectedOp { expected } => diagnostic! {
+                error => "unexpected operator",
+                label: primary(format!("expected '{}'", expected), file, span),
             },
         }
     }
