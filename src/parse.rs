@@ -21,21 +21,12 @@ pub trait FrontendDatabase: SourceDatabase {
 
     /// Tries to parse the source code of the given file.
     fn parse(&self, file: FileId) -> ParseResult<Vec<Item>>;
-
-    /// Tries to parse a single expression from the file.
-    fn parse_expr(&self, file: FileId) -> ParseResult<Expr>;
 }
 
 fn parse(db: &dyn FrontendDatabase, file: FileId) -> ParseResult<Vec<Item>> {
     let code = db.source(file);
     let mut parser = Parser::new(db.rodeo(), &code, file);
     parser.parse()
-}
-
-fn parse_expr(db: &dyn FrontendDatabase, file: FileId) -> ParseResult<Expr> {
-    let code = db.source(file);
-    let mut parser = Parser::new(db.rodeo(), &code, file);
-    parser.parse_expr()
 }
 
 #[derive(Clone)]
@@ -132,15 +123,22 @@ impl<'input> Parser<'input> {
         let token = self.peek()?;
         match token.kind {
             Kind::Def | Kind::Extern => self.parse_def(),
-
-            kind => Err(Locatable::new(
-                SyntaxError::ExpectedOneOf {
-                    expected: vec![Kind::Def, Kind::Extern],
-                    found: kind,
-                },
-                token.span,
-                self.file,
-            )),
+            _ => {
+                let expr = self.parse_expr()?;
+                Ok(Item {
+                    span: expr.span,
+                    kind: ItemKind::Function {
+                        // The original tutorial names the top level expression function `__anon_expr`,
+                        // but I think "main" makes much more sense.
+                        name: Identifier {
+                            spur: self.rodeo.get_or_intern("main"),
+                            span: expr.span,
+                        },
+                        args: Vec::new(),
+                        body: Box::new(expr),
+                    },
+                })
+            }
         }
     }
 

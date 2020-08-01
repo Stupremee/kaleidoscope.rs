@@ -1,4 +1,4 @@
-use crate::parse::ast::{Expr, ExprKind, LetVar};
+use crate::parse::ast::{Expr, ExprKind, Item, ItemKind, LetVar};
 use lasso::ThreadedRodeo;
 use pretty::{DocAllocator, DocBuilder};
 
@@ -98,6 +98,116 @@ impl Pretty for ExprKind {
                     .append(alloc.hardline())
                     .append(body.pretty(alloc, rodeo).nest(2))
                     .group()
+            }
+        }
+    }
+}
+
+impl Pretty for Item {
+    fn pretty<'alloc, D>(
+        &'alloc self,
+        alloc: &'alloc D,
+        rodeo: &ThreadedRodeo,
+    ) -> DocBuilder<'alloc, D>
+    where
+        D: DocAllocator<'alloc>,
+        D::Doc: Clone,
+    {
+        self.kind.pretty(alloc, rodeo)
+    }
+}
+
+impl Pretty for ItemKind {
+    fn pretty<'alloc, D>(
+        &'alloc self,
+        alloc: &'alloc D,
+        rodeo: &ThreadedRodeo,
+    ) -> DocBuilder<'alloc, D>
+    where
+        D: DocAllocator<'alloc>,
+        D::Doc: Clone,
+    {
+        match self {
+            ItemKind::Function { name, args, body } => {
+                let separator = alloc.space();
+                alloc
+                    .text("def")
+                    .append(alloc.space())
+                    .append(alloc.as_string(rodeo.resolve(&name.spur)))
+                    .append(alloc.text("("))
+                    .append(
+                        alloc.intersperse(
+                            args.into_iter()
+                                .map(|name| alloc.as_string(rodeo.resolve(&name.spur))),
+                            separator,
+                        ),
+                    )
+                    .append(alloc.text(")"))
+                    .group()
+                    .append(
+                        alloc
+                            .hardline()
+                            .append(body.pretty(alloc, rodeo))
+                            .append(alloc.text(";"))
+                            .nest(2),
+                    )
+            }
+            ItemKind::Extern { name, args } => {
+                let separator = alloc.space();
+                alloc
+                    .text("extern")
+                    .append(alloc.space())
+                    .append(alloc.as_string(rodeo.resolve(&name.spur)))
+                    .append(alloc.text("("))
+                    .append(
+                        alloc.intersperse(
+                            args.into_iter()
+                                .map(|name| alloc.as_string(rodeo.resolve(&name.spur))),
+                            separator,
+                        ),
+                    )
+                    .append(alloc.text(")"))
+                    .append(alloc.text(";"))
+                    .group()
+            }
+            ItemKind::Operator {
+                op,
+                prec,
+                is_binary,
+                body,
+                args,
+            } => {
+                let separator = alloc.space();
+                alloc
+                    .text("def")
+                    .append(alloc.space())
+                    .append(alloc.text(if *is_binary { "binary" } else { "unary" }))
+                    .append(alloc.as_string(op))
+                    .append(if *is_binary {
+                        alloc
+                            .space()
+                            .append(alloc.as_string(prec))
+                            .append(alloc.space())
+                    } else {
+                        alloc.nil()
+                    })
+                    .append(alloc.text("("))
+                    .append(
+                        alloc.intersperse(
+                            args.into_iter()
+                                .map(|name| alloc.as_string(rodeo.resolve(&name.spur))),
+                            separator,
+                        ),
+                    )
+                    .append(alloc.text(")"))
+                    .group()
+                    .append(
+                        alloc
+                            .hardline()
+                            .append(body.pretty(alloc, rodeo))
+                            .append(alloc.text(";"))
+                            .nest(2),
+                    )
             }
         }
     }

@@ -7,7 +7,7 @@ mod commands;
 mod helper;
 
 use self::helper::ReplHelper;
-use kaleidoscope::{parse::FrontendDatabase, source::File, source::SourceDatabase, Compiler};
+use kaleidoscope::{parse::FrontendDatabase, Compiler};
 use rustyline::{error::ReadlineError, Cmd, CompletionType, Config, EditMode, Editor, KeyPress};
 use smol_str::SmolStr;
 use std::{collections::HashMap, sync::Arc};
@@ -83,19 +83,7 @@ impl Repl {
         }
     }
 
-    fn execute_code(&mut self, line: String) {
-        let name = Arc::new(SmolStr::new("repl"));
-        let source = Arc::new(line);
-        let file = File::new(name, source);
-        let file = self.db.intern_file(file);
-
-        match self.db.parse(file) {
-            Ok(items) => {
-                for item in items {
-                    println!("=> {:#?}", item);
-                }
-            }
-            Err(err) => self.db.emit(err.into()).expect("failed to emit diagnostic"),
-        };
+    fn execute_code(&mut self, _line: String) {
+        println!("executing code coming soon");
     }
 }
