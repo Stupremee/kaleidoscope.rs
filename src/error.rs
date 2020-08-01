@@ -1,9 +1,10 @@
 use crate::{
     parse::token::Kind,
-    source::FileId,
+    source::{FileCache, FileId},
     span::{Locatable, Span},
-    Diagnostic,
+    Diagnostic, SourceDatabase,
 };
+use std::io;
 
 /// A helper macro to generate `Diagnostic`s using a nice dsl.
 ///
@@ -160,4 +161,12 @@ impl<T: IntoDiagnostic> Into<Diagnostic> for Locatable<T> {
         let (data, span, file) = self.destruct();
         data.into_diagnostic(file, span)
     }
+}
+pub fn emit(db: &dyn SourceDatabase, err: Diagnostic) -> io::Result<()> {
+    use codespan_reporting::term::{self, termcolor};
+
+    let file_cache = FileCache::new(db);
+    let mut stdout = termcolor::StandardStream::stdout(termcolor::ColorChoice::Auto);
+    let config = term::Config::default();
+    term::emit(&mut stdout, &config, &file_cache, &err.into())
 }

@@ -2,6 +2,7 @@
 
 use super::Repl;
 use kaleidoscope::{
+    error,
     parse::FrontendDatabase,
     pretty::Pretty,
     source::{File, SourceDatabase},
@@ -45,6 +46,6 @@ fn ast_command(repl: &mut Repl, code: &str) {
                 println!();
             }
         }
-        Err(err) => repl.db.emit(err.into()).expect("failed to emit diagnostic"),
+        Err(err) => error::emit(&repl.db, err.into()).expect("failed to emit diagnostic"),
     };
 }

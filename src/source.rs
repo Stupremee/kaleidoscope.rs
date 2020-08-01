@@ -111,3 +111,57 @@ fn line_range(db: &dyn SourceDatabase, file: FileId, line_index: usize) -> Optio
     let next_line = db.line_start(file, line_index + 1)?;
     Some(line..next_line)
 }
+
+/// A atomic counted reference to a `String`, which implements `AsRef<str>`
+#[derive(Debug)]
+pub struct StringRef {
+    string: Arc<String>,
+}
+
+impl AsRef<str> for StringRef {
+    fn as_ref(&self) -> &str {
+        self.string.as_ref()
+    }
+}
+
+/// A cache that can be used as an [`Files`] implementation
+/// and will use a `SourceDatabase` to get the information.
+///
+/// This allows caching expensive things like line ranges or indicies.
+///
+/// Thanks to [`Kixiron`] for this suggestion.
+///
+/// [`Kixiron`]: https://github.com/Kixiron
+#[derive(Clone)]
+pub struct FileCache<'db> {
+    db: &'db dyn SourceDatabase,
+}
+
+impl<'db> FileCache<'db> {
+    pub fn new(db: &'db dyn SourceDatabase) -> Self {
+        Self { db }
+    }
+}
+
+impl<'a> codespan_reporting::files::Files<'a> for FileCache<'a> {
+    type FileId = FileId;
+    type Name = Arc<SmolStr>;
+    type Source = StringRef;
+
+    fn name(&'a self, id: Self::FileId) -> Option<Self::Name> {
+        Some(self.db.name(id))
+    }
+
+    fn source(&'a self, id: Self::FileId) -> Option<Self::Source> {
+        let source = self.db.source(id);
+        Some(StringRef { string: source })
+    }
+
+    fn line_index(&'a self, id: Self::FileId, byte_index: usize) -> Option<usize> {
+        self.db.line_index(id, byte_index)
+    }
+
+    fn line_range(&'a self, id: Self::FileId, line_index: usize) -> Option<Range<usize>> {
+        self.db.line_range(id, line_index)
+    }
+}
