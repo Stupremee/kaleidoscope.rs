@@ -21,12 +21,21 @@ pub trait FrontendDatabase: SourceDatabase {
 
     /// Tries to parse the source code of the given file.
     fn parse(&self, file: FileId) -> ParseResult<Vec<Item>>;
+
+    /// Tries to parse a single expression from the file.
+    fn parse_expr(&self, file: FileId) -> ParseResult<Expr>;
 }
 
 fn parse(db: &dyn FrontendDatabase, file: FileId) -> ParseResult<Vec<Item>> {
     let code = db.source(file);
     let mut parser = Parser::new(db.rodeo(), &code, file);
     parser.parse()
+}
+
+fn parse_expr(db: &dyn FrontendDatabase, file: FileId) -> ParseResult<Expr> {
+    let code = db.source(file);
+    let mut parser = Parser::new(db.rodeo(), &code, file);
+    parser.parse_expr()
 }
 
 #[derive(Clone)]

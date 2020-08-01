@@ -3,18 +3,23 @@
 //!
 //! [`rustyline`]: https://docs.rs/rustyline
 
+mod commands;
 mod helper;
 
 use self::helper::ReplHelper;
 use kaleidoscope::{parse::FrontendDatabase, source::File, source::SourceDatabase, Compiler};
 use rustyline::{error::ReadlineError, Cmd, CompletionType, Config, EditMode, Editor, KeyPress};
 use smol_str::SmolStr;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
+
+/// The prefix to execute commands.
+const PREFIX: char = '.';
 
 pub struct Repl {
     editor: Editor<ReplHelper>,
     prompt: SmolStr,
     db: Compiler,
+    commands: HashMap<&'static str, fn(&mut Repl, &str)>,
 }
 
 impl Repl {
@@ -28,7 +33,9 @@ impl Repl {
             .build();
         let mut editor = Editor::with_config(config);
 
-        let helper = ReplHelper::default();
+        let commands = commands::default_commands();
+
+        let helper = ReplHelper::new(commands.keys().copied().collect());
         editor.set_helper(Some(helper));
 
         editor.bind_sequence(KeyPress::Up, Cmd::LineUpOrPreviousHistory(1));
@@ -40,6 +47,7 @@ impl Repl {
             editor,
             prompt: prompt.into(),
             db,
+            commands,
         }
     }
 
@@ -61,6 +69,21 @@ impl Repl {
 
     fn process_line(&mut self, line: String) {
         self.editor.add_history_entry(line.clone());
+
+        let trimmed_line = line.trim();
+        if trimmed_line.starts_with(PREFIX) {
+            let name = trimmed_line.split(' ').next().unwrap();
+
+            match self.commands.get(&name[1..]) {
+                Some(cmd) => cmd(self, &trimmed_line[name.len()..]),
+                None => println!("unknown command '{}'", name),
+            }
+        } else {
+            self.execute_code(line)
+        }
+    }
+
+    fn execute_code(&mut self, line: String) {
         let name = Arc::new(SmolStr::new("repl"));
         let source = Arc::new(line);
         let file = File::new(name, source);
