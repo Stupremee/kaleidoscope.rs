@@ -122,7 +122,7 @@ impl<'input> Parser<'input> {
     pub fn parse_item(&mut self) -> ParseResult<Item> {
         let token = self.peek()?;
         match token.kind {
-            Kind::Def => self.parse_def(),
+            Kind::Def | Kind::Extern => self.parse_def(),
 
             kind => Err(Locatable::new(
                 SyntaxError::ExpectedOneOf {
@@ -364,9 +364,10 @@ impl<'input> Parser<'input> {
                         kind: ExprKind::Var(identifier),
                     });
                 }
+                self.eat(Kind::LeftParen)?;
 
                 let mut args = Vec::new();
-                while self.next_is(Kind::RightParen) {
+                while !self.next_is(Kind::RightParen) {
                     let arg = self.parse_expr()?;
                     args.push(arg);
                     if self.next_is(Kind::Comma) {
@@ -375,9 +376,9 @@ impl<'input> Parser<'input> {
                         break;
                     }
                 }
-                let l_paren = self.eat(Kind::LeftParen)?.span;
+                let r_paren = self.eat(Kind::RightParen)?.span;
                 Ok(Expr {
-                    span: identifier.span.merge(l_paren),
+                    span: identifier.span.merge(r_paren),
                     kind: ExprKind::Call {
                         callee: identifier,
                         args,

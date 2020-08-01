@@ -3,6 +3,7 @@
 
 pub mod error;
 pub mod parse;
+pub mod pretty;
 pub mod source;
 pub mod span;
 
