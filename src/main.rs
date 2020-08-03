@@ -4,7 +4,7 @@
 
 mod repl;
 
-use std::{ffi::OsStr, path::PathBuf};
+use std::{ffi::OsStr, io::Write, path::PathBuf};
 
 const HELP_MESSAGE: &str = concat!(
     "Kaleidoscope ",

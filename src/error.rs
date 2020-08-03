@@ -63,6 +63,7 @@ pub enum CompileError {
     InvalidArguments { expected: usize, found: usize },
     UnknownOperator,
     InvalidCall,
+    InvalidFunctionGenerated,
 }
 
 pub type CompileResult<T> = std::result::Result<T, Locatable<CompileError>>;
@@ -89,6 +90,10 @@ impl IntoDiagnostic for CompileError {
             CompileError::InvalidArguments { expected, found } => diagnostic! {
                 error => "invalid number of arguments provided",
                 label: primary(format!("function takes {} arguments, but only {} were provided", expected, found), file, span),
+            },
+            CompileError::InvalidFunctionGenerated => diagnostic! {
+                error => "invalid function generated",
+                label: primary("codegen generated invalid code for this function", file, span),
             },
         }
     }

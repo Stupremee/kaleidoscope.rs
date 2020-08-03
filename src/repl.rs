@@ -7,7 +7,11 @@ mod commands;
 mod helper;
 
 use self::helper::ReplHelper;
-use kaleidoscope::{parse::FrontendDatabase, Compiler};
+use inkwell::{context::Context, passes::PassManager};
+use kaleidoscope::{
+    codegen::Compiler, error::emit, parse::FrontendDatabase, source::File, CompilerDatabase,
+    SourceDatabase,
+};
 use rustyline::{error::ReadlineError, Cmd, CompletionType, Config, EditMode, Editor, KeyPress};
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
@@ -17,7 +21,7 @@ const PROMPT: &str = ">> ";
 
 pub struct Repl {
     editor: Editor<ReplHelper>,
-    db: Compiler,
+    db: CompilerDatabase,
     commands: HashMap<&'static str, fn(&mut Repl, &str)>,
 }
 
@@ -40,7 +44,7 @@ impl Repl {
         editor.bind_sequence(KeyPress::Up, Cmd::LineUpOrPreviousHistory(1));
         editor.bind_sequence(KeyPress::Down, Cmd::LineDownOrNextHistory(1));
 
-        let mut db = Compiler::default();
+        let mut db = CompilerDatabase::default();
         db.set_rodeo(Arc::new(Default::default()));
         Self {
             editor,
@@ -102,7 +106,36 @@ impl Repl {
         }
     }
 
-    fn execute_code(&mut self, _line: String) {
-        println!("executing code coming soon");
+    fn execute_code(&mut self, line: String) {
+        let file = File::new(Arc::new("repl".into()), Arc::new(line));
+        let file = self.db.intern_file(file);
+        let ast = match self.db.parse(file) {
+            Ok(ast) => ast,
+            Err(err) => {
+                emit(&self.db, err.into()).expect("failed to emit error");
+                return;
+            }
+        };
+
+        let ctx = Context::create();
+        let builder = ctx.create_builder();
+        let module = ctx.create_module("repl");
+
+        let fpm = PassManager::create(&module);
+        fpm.initialize();
+
+        let mut compiler = Compiler::new(file, &ctx, &builder, &fpm, &module, self.db.rodeo());
+        for item in ast.iter() {
+            match compiler.compile_item(&item) {
+                Ok(_) => {}
+                Err(err) => {
+                    emit(&self.db, err.into()).expect("failed to emit error");
+                    return;
+                }
+            };
+        }
+        if let Some(result) = compiler.run_main() {
+            println!("=> {}", result);
+        }
     }
 }

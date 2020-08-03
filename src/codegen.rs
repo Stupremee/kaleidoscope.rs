@@ -6,31 +6,66 @@
 
 use crate::{
     error::{CompileError, CompileResult},
-    parse::ast::{Expr, ExprKind, LetVar},
+    parse::ast::{Expr, ExprKind, Identifier, Item, ItemKind, LetVar},
     source::FileId,
+    span::Span,
 };
 use inkwell::{
     builder::Builder,
     context::Context,
     module::Module,
-    values::{FloatValue, FunctionValue, PointerValue},
-    FloatPredicate,
+    passes::PassManager,
+    types::BasicTypeEnum,
+    values::{BasicValue, FloatValue, FunctionValue, PointerValue},
+    FloatPredicate, OptimizationLevel,
 };
 use lasso::{Spur, ThreadedRodeo};
 use smol_str::SmolStr;
 use std::{collections::HashMap, sync::Arc};
 
 /// The LLVM compiler.
-pub struct Compiler<'ctx> {
+pub struct Compiler<'r, 'ctx> {
     ctx: &'ctx Context,
-    builder: Builder<'ctx>,
-    module: Module<'ctx>,
+    builder: &'r Builder<'ctx>,
+    module: &'r Module<'ctx>,
+    fpm: &'r PassManager<FunctionValue<'ctx>>,
+
     vars: HashMap<Spur, PointerValue<'ctx>>,
     rodeo: Arc<ThreadedRodeo>,
     file: FileId,
 }
 
-impl<'ctx> Compiler<'ctx> {
+impl<'r, 'ctx> Compiler<'r, 'ctx> {
+    pub fn new(
+        file: FileId,
+        ctx: &'ctx Context,
+        builder: &'r Builder<'ctx>,
+        fpm: &'r PassManager<FunctionValue<'ctx>>,
+        module: &'r Module<'ctx>,
+        rodeo: Arc<ThreadedRodeo>,
+    ) -> Self {
+        Self {
+            ctx,
+            builder,
+            module,
+            fpm,
+            vars: HashMap::new(),
+            rodeo,
+            file,
+        }
+    }
+
+    /// Tries to find a `main` function, runs it and returns the result.
+    pub fn run_main(&self) -> Option<f64> {
+        let jit = self
+            .module
+            .create_jit_execution_engine(OptimizationLevel::None)
+            .unwrap();
+
+        let fun = unsafe { jit.get_function::<unsafe extern "C" fn() -> f64>("main") }.ok()?;
+        Some(unsafe { fun.call() })
+    }
+
     #[inline]
     fn get_function(&self, name: &str) -> Option<FunctionValue<'ctx>> {
         // TODO: Keep a list of all method defined in the whole file.
@@ -95,31 +130,31 @@ impl<'ctx> Compiler<'ctx> {
                 ref right,
             } => {
                 let name = self.binary_fn_name(*op);
+                let lhs = self.compile_expr(left)?;
+                let rhs = self.compile_expr(right)?;
+
+                match op {
+                    '+' => return Ok(self.builder.build_float_add(lhs, rhs, "addtemp")),
+                    '-' => return Ok(self.builder.build_float_sub(lhs, rhs, "subtemp")),
+                    '*' => return Ok(self.builder.build_float_mul(lhs, rhs, "multemp")),
+                    '<' => {
+                        let result = self.builder.build_float_compare(
+                            FloatPredicate::ULT,
+                            lhs,
+                            rhs,
+                            "cmptemp",
+                        );
+                        return Ok(self.builder.build_unsigned_int_to_float(
+                            result,
+                            self.ctx.f64_type(),
+                            "booltmp",
+                        ));
+                    }
+                    _ => {}
+                };
+
                 match self.get_function(&name) {
                     Some(fun) => {
-                        let lhs = self.compile_expr(left)?;
-                        let rhs = self.compile_expr(right)?;
-
-                        match op {
-                            '+' => return Ok(self.builder.build_float_add(lhs, rhs, "addtemp")),
-                            '-' => return Ok(self.builder.build_float_sub(lhs, rhs, "subtemp")),
-                            '*' => return Ok(self.builder.build_float_mul(lhs, rhs, "multemp")),
-                            '<' => {
-                                let result = self.builder.build_float_compare(
-                                    FloatPredicate::ULT,
-                                    lhs,
-                                    rhs,
-                                    "cmptemp",
-                                );
-                                return Ok(self.builder.build_unsigned_int_to_float(
-                                    result,
-                                    self.ctx.f64_type(),
-                                    "booltmp",
-                                ));
-                            }
-                            _ => {}
-                        };
-
                         let result =
                             self.builder
                                 .build_call(fun, &[lhs.into(), rhs.into()], "temp");
@@ -243,6 +278,90 @@ impl<'ctx> Compiler<'ctx> {
                 }
 
                 Ok(body)
+            }
+        }
+    }
+
+    fn compile_proto(
+        &mut self,
+        name: Spur,
+        proto_args: &Vec<Identifier>,
+    ) -> CompileResult<FunctionValue<'ctx>> {
+        let ret_ty = self.ctx.f64_type();
+
+        let args = std::iter::repeat(ret_ty)
+            .take(proto_args.len())
+            .map(|ty| ty.into())
+            .collect::<Vec<BasicTypeEnum<'_>>>();
+
+        let fun_ty = self.ctx.f64_type().fn_type(args.as_slice(), false);
+        let fun = self
+            .module
+            .add_function(self.rodeo.resolve(&name), fun_ty, None);
+
+        for (arg, Identifier { spur, .. }) in fun.get_param_iter().zip(proto_args) {
+            arg.into_float_value().set_name(self.rodeo.resolve(&spur));
+        }
+
+        Ok(fun)
+    }
+
+    fn compile_fun(
+        &mut self,
+        span: Span,
+        name: Spur,
+        args: &Vec<Identifier>,
+        body: &Expr,
+    ) -> CompileResult<FunctionValue<'ctx>> {
+        let fun = self.compile_proto(name, args)?;
+        let entry = self.ctx.append_basic_block(fun, "entry");
+
+        self.builder.position_at_end(entry);
+
+        self.vars.reserve(args.len());
+        for (arg, Identifier { spur, .. }) in fun.get_param_iter().zip(args) {
+            let name = self.rodeo.resolve(&spur);
+            let alloca = self.create_entry_block_alloca(fun, name);
+            self.builder.build_store(alloca, arg);
+            self.vars.insert(spur.clone(), alloca);
+        }
+
+        let body = self.compile_expr(body)?;
+        self.builder.build_return(Some(&body));
+
+        if fun.verify(true) {
+            self.fpm.run_on(&fun);
+            Ok(fun)
+        } else {
+            unsafe { fun.delete() }
+            Err(span.locate(self.file, CompileError::InvalidFunctionGenerated))
+        }
+    }
+
+    pub fn compile_item(&mut self, item: &Item) -> CompileResult<FunctionValue<'ctx>> {
+        match &item.kind {
+            ItemKind::Function { name, args, body } => {
+                self.compile_fun(item.span, name.spur, args, body)
+            }
+            ItemKind::Extern { name, args } => self.compile_proto(name.spur, args),
+            ItemKind::Operator {
+                op,
+                is_binary,
+                body,
+                args,
+                ..
+            } => {
+                let name = if *is_binary {
+                    self.binary_fn_name(*op)
+                } else {
+                    self.unary_fn_name(*op)
+                };
+                self.compile_fun(
+                    item.span,
+                    self.rodeo.get_or_intern(name.as_str()),
+                    args,
+                    body,
+                )
             }
         }
     }
