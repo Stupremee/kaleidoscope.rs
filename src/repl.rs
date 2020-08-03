@@ -9,22 +9,21 @@ mod helper;
 use self::helper::ReplHelper;
 use kaleidoscope::{parse::FrontendDatabase, Compiler};
 use rustyline::{error::ReadlineError, Cmd, CompletionType, Config, EditMode, Editor, KeyPress};
-use smol_str::SmolStr;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 /// The prefix to execute commands.
 const PREFIX: char = '.';
+const PROMPT: &str = ">> ";
 
 pub struct Repl {
     editor: Editor<ReplHelper>,
-    prompt: SmolStr,
     db: Compiler,
     commands: HashMap<&'static str, fn(&mut Repl, &str)>,
 }
 
 impl Repl {
     /// Creates a new `Repl` instance and sets up various things like keybinds.
-    pub fn new(prompt: impl Into<SmolStr>) -> Self {
+    pub fn new() -> Self {
         let config = Config::builder()
             .history_ignore_space(true)
             .completion_type(CompletionType::List)
@@ -45,17 +44,34 @@ impl Repl {
         db.set_rodeo(Arc::new(Default::default()));
         Self {
             editor,
-            prompt: prompt.into(),
             db,
             commands,
         }
     }
 
+    fn history_path(&self) -> Option<PathBuf> {
+        let mut path = dirs::data_dir()?;
+        path.push("kaleidoscope_history");
+        Some(path)
+    }
+
+    fn save_history(&mut self) -> Option<()> {
+        let path = self.history_path()?;
+        self.editor.save_history(&path).ok()
+    }
+
+    fn load_history(&mut self) -> Option<()> {
+        let path = self.history_path()?;
+        self.editor.load_history(&path).ok()
+    }
+
     pub fn run(&mut self) -> rustyline::Result<()> {
+        self.load_history();
+
         let version = env!("CARGO_PKG_VERSION");
         println!("Kaleidoscope {}", version);
-        loop {
-            let line = self.editor.readline(&self.prompt);
+        let result = loop {
+            let line = self.editor.readline(PROMPT);
             match line {
                 Ok(line) => self.process_line(line),
                 // Ctrl + C will skip and abort the current line.
@@ -64,7 +80,10 @@ impl Repl {
                 Err(ReadlineError::Eof) => break Ok(()),
                 Err(error) => break Err(error),
             }
-        }
+        };
+        self.save_history();
+
+        result
     }
 
     fn process_line(&mut self, line: String) {
